@@ -1,16 +1,22 @@
-import os, re
+import os, re, random, argparse, subprocess, logging
 from datetime import datetime
-import random
+
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', filename='write.log')
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-i', '--input-dir', type=str, help='Directory to read from', required=True)
+parser.add_argument('-o', '--output-dir', type=str, help='Directory to write to', required=True)
+args = parser.parse_args()
 
 def get_ext(path):
     return os.path.splitext(path)[1]
 
 home = os.path.expanduser("~")
-im_dir = os.path.join(home, '2011-2015')
+im_dir = args.input_dir
 im_s = set()
 json_s = set()
 im_json_match_d = {}
-multiple_pattern = '\(\d+\)$'
+multiple_pattern = '\(\d+?\)$'
 im_path_d = {}
 json_path_d = {}
 for root, dirs, files in os.walk(im_dir):
@@ -47,7 +53,7 @@ for json in json_s:
     if json not in im_s:
         print('JSON without image: {}'.format(os.path.join(root, json)))
 
-edited_im_dir = os.path.join(home, '2011-2015 edited')
+edited_im_dir = args.output_dir
 import json
 if not os.path.exists(edited_im_dir):
     os.mkdir(edited_im_dir)
@@ -90,12 +96,38 @@ for k, v in im_json_match_d.items():
     while os.path.exists(new_im_path):
         new_im = str(time.strftime('%Y%m%d_%H%M%S') + '-' + str(random.randint(1000, 9999)) + os.path.splitext(k)[1]).lower()
         new_im_path = os.path.join(edited_im_dir, new_im)
-    outfile_str = '-o "{}"'.format(os.path.join(edited_im_dir, new_im.lower()))
+    outfile_str = '-o "{}"'.format(os.path.join(edited_im_dir, new_im))
     md_l.append(outfile_str)
+    logging.info('Original image: {}'.format(k))
     if k.lower().endswith('.bmp') or k.lower().endswith('.avi') or k.lower().endswith('.wmv'):
-        os.system('cp -v "{}" "{}" 2>&1'.format(k, new_im_path))
-        os.system('echo copied "{}" to "{}" >> out.log'.format(k, new_im_path))
+        call = 'cp -v "{}" "{}"'.format(k, new_im_path)
     else:
-        os.system('exiftool "{}" {} >> out.log 2>&1'.format(k, ' '.join(md_l)))
-        os.system('echo used exiftool "{}" {} >> out.log'.format(k, ' '.join(md_l)))
-    os.system('echo >> out.log')
+        call = 'exiftool "{}" {} -m'.format(k, ' '.join(md_l))
+    logging.info('Running `{}`'.format(call))
+    process = subprocess.run(call, shell=True, capture_output=True)
+    stdout, stderr = process.stdout.decode('utf-8'), process.stderr.decode('utf-8')
+    if stdout:
+        logging.info(stdout)
+    if stderr:
+        logging.error(stderr)
+        if 'looks more like a JPEG' in stderr:
+            k_jpeg = os.path.splitext(k)[0] + '.jpg'
+            new_im_path_jpeg = os.path.splitext(new_im_path)[0] + '.jpg'
+            mv_call = 'mv -v "{}" "{}"'.format(k, k_jpeg)
+            logging.info('Running `{}`'.format(mv_call))
+            process = subprocess.run(mv_call, shell=True, capture_output=True)
+            stdout, stderr = process.stdout.decode('utf-8'), process.stderr.decode('utf-8')
+            if stdout:
+                logging.info(stdout)
+            if stderr:
+                logging.error(stderr)
+            md_l[-1] = '-o "{}"'.format(new_im_path_jpeg)
+            call = 'exiftool "{}" {} -m'.format(k_jpeg, ' '.join(md_l))
+            logging.info('Running `{}`'.format(call))
+            process = subprocess.run(call, shell=True, capture_output=True)
+            stdout, stderr = process.stdout.decode('utf-8'), process.stderr.decode('utf-8')
+            if stdout:
+                logging.info(stdout)
+            if stderr:
+                logging.error(stderr)
+    logging.info('New image: {}'.format(new_im_path))

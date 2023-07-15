@@ -6,7 +6,7 @@ def get_ext(path):
     return os.path.splitext(path)[1]
 
 home = os.path.expanduser("~")
-im_dir = os.path.join(home, 'till 2010 end')
+im_dir = os.path.join(home, '2011-2015')
 im_s = set()
 json_s = set()
 im_json_match_d = {}
@@ -19,9 +19,9 @@ for root, dirs, files in os.walk(im_dir):
     for im in im_l:
         if im in im_s:
             print('Duplicate: {}'.format(os.path.join(root, im)))
-        im_s.add(im[:46])
+        im_s.add(os.path.join(root, im[:46]))
         im_path = os.path.join(root, im)
-        im_path_d[im[:46]] = im_path
+        im_path_d[os.path.join(root, im[:46])] = im_path
     for json in json_l:
         json_base = os.path.splitext(json)[0]
         multiple_search = re.search(multiple_pattern, json_base)
@@ -32,9 +32,9 @@ for root, dirs, files in os.walk(im_dir):
             json_base = im_json_split[0] + multiple_text + im_json_split[1]
         if json_base in json_s:
             print('Duplicate: {}'.format(os.path.join(root, json)))
-        json_s.add(json_base[:46])
+        json_s.add(os.path.join(root, json_base[:46]))
         json_path = os.path.join(root, json)
-        json_path_d[json_base[:46]] = json_path
+        json_path_d[os.path.join(root, json_base[:46])] = json_path
 for im in im_s:
     if im not in json_s:
         print('Image without json: {}'.format(os.path.join(root, im)))
@@ -47,7 +47,7 @@ for json in json_s:
     if json not in im_s:
         print('JSON without image: {}'.format(os.path.join(root, json)))
 
-edited_im_dir = os.path.join(home, 'till 2010 end edited')
+edited_im_dir = os.path.join(home, '2011-2015 edited')
 import json
 if not os.path.exists(edited_im_dir):
     os.mkdir(edited_im_dir)
@@ -92,8 +92,10 @@ for k, v in im_json_match_d.items():
         new_im_path = os.path.join(edited_im_dir, new_im)
     outfile_str = '-o "{}"'.format(os.path.join(edited_im_dir, new_im.lower()))
     md_l.append(outfile_str)
-    if k.lower().endswith('.bmp') or k.lower().endswith('.avi'):
-        os.system('cp "{}" "{}"'.format(k, new_im_path))
+    if k.lower().endswith('.bmp') or k.lower().endswith('.avi') or k.lower().endswith('.wmv'):
+        os.system('cp -v "{}" "{}" 2>&1'.format(k, new_im_path))
+        os.system('echo copied "{}" to "{}" >> out.log'.format(k, new_im_path))
     else:
-        os.system('exiftool "{}" {} >> out.log'.format(k, ' '.join(md_l)))
-    
+        os.system('exiftool "{}" {} >> out.log 2>&1'.format(k, ' '.join(md_l)))
+        os.system('echo used exiftool "{}" {} >> out.log'.format(k, ' '.join(md_l)))
+    os.system('echo >> out.log')

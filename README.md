@@ -6,3 +6,8 @@ This script will write EXIF metadata to images exported by Google Photos Takeout
 Note: EXIF metadata cannot be written to `AVI` and `BMP` files. The script will skip these files. `AVI` to `MP4` conversion is recommended.
 
 I have written this script to export my images from Google Photos without losing important metadata, especially datetime. Even though many images are exported with the correct datetime, some images are exported with the datetime of the export. I assume this happens to the images that have conflicting names.
+
+## Requirements
+
+This script uses `ExifTool` to write metadata in images / videos. Make sure it's installed, found [here](https://exiftool.org).
+

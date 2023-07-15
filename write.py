@@ -88,7 +88,7 @@ for k, v in im_json_match_d.items():
         md_l.append('-GPSAltitude={} -GPSAltitudeRef="Above Sea Level"'.format(altitude))
     if 'description' not in json_data:
         print('No description: {}'.format(v))
-    description = json_data['description'].strip()
+    description = json_data['description'].strip().replace('\n', ' ; ').replace('"', "'")
     if description:
         md_l.append('-Caption-Abstract="{}" -Description="{}" -ImageDescription="{}"'.format(description, description, description))
     new_im = str(time.strftime('%Y%m%d_%H%M%S') + os.path.splitext(k)[1]).lower()
@@ -99,13 +99,14 @@ for k, v in im_json_match_d.items():
     outfile_str = '-o "{}"'.format(os.path.join(edited_im_dir, new_im))
     md_l.append(outfile_str)
     logging.info('Original image: {}'.format(k))
-    if k.lower().endswith('.bmp') or k.lower().endswith('.avi') or k.lower().endswith('.wmv'):
+    k_lower = k.lower()
+    if k_lower.endswith('.bmp') or k_lower.endswith('.avi') or k_lower.endswith('.wmv') or k_lower.endswith('.mkv'):
         call = 'cp -v "{}" "{}"'.format(k, new_im_path)
     else:
         call = 'exiftool "{}" {} -m'.format(k, ' '.join(md_l))
     logging.info('Running `{}`'.format(call))
     process = subprocess.run(call, shell=True, capture_output=True)
-    stdout, stderr = process.stdout.decode('utf-8'), process.stderr.decode('utf-8')
+    stdout, stderr = process.stdout.decode('utf-8').strip(), process.stderr.decode('utf-8').strip()
     if stdout:
         logging.info(stdout)
     if stderr:
@@ -113,19 +114,22 @@ for k, v in im_json_match_d.items():
         if 'looks more like a JPEG' in stderr:
             k_jpeg = os.path.splitext(k)[0] + '.jpg'
             new_im_path_jpeg = os.path.splitext(new_im_path)[0] + '.jpg'
-            mv_call = 'mv -v "{}" "{}"'.format(k, k_jpeg)
+            mv_call = 'cp -v "{}" "{}"'.format(k, k_jpeg)
             logging.info('Running `{}`'.format(mv_call))
             process = subprocess.run(mv_call, shell=True, capture_output=True)
-            stdout, stderr = process.stdout.decode('utf-8'), process.stderr.decode('utf-8')
+            stdout, stderr = process.stdout.decode('utf-8').strip(), process.stderr.decode('utf-8').strip()
             if stdout:
                 logging.info(stdout)
             if stderr:
                 logging.error(stderr)
+            while os.path.exists(new_im_path_jpeg):
+                new_im = str(time.strftime('%Y%m%d_%H%M%S') + '-' + str(random.randint(1000, 9999)) + os.path.splitext(new_im_path_jpeg)[1]).lower()
+                new_im_path_jpeg = os.path.join(edited_im_dir, new_im)
             md_l[-1] = '-o "{}"'.format(new_im_path_jpeg)
             call = 'exiftool "{}" {} -m'.format(k_jpeg, ' '.join(md_l))
             logging.info('Running `{}`'.format(call))
             process = subprocess.run(call, shell=True, capture_output=True)
-            stdout, stderr = process.stdout.decode('utf-8'), process.stderr.decode('utf-8')
+            stdout, stderr = process.stdout.decode('utf-8').strip(), process.stderr.decode('utf-8').strip()
             if stdout:
                 logging.info(stdout)
             if stderr:

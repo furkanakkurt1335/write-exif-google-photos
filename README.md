@@ -9,6 +9,7 @@ This script will write EXIF metadata to images exported by Google Photos Takeout
         - [cloudconvert.com/wmv-to-mp4](https://cloudconvert.com/wmv-to-mp4)
         - [cloudconvert.com/mkv-to-mp4](https://cloudconvert.com/mkv-to-mp4)
         - [cloudconvert.com/jfif-to-jpg](https://cloudconvert.com/jfif-to-jpg)
+    - If you have `ffmpeg` installed, mkv to mp4 conversion can be done by: `ffmpeg -i <filename>.mkv -codec copy <filename>.mp4`
 
 I have written this script to export my images from Google Photos without losing important metadata, especially datetime. Even though many images are exported with the correct datetime, some images are exported with the datetime of the export. I assume this happens to the images that have conflicting names.
 

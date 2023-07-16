@@ -1,4 +1,4 @@
-import os, re, random, argparse, subprocess, logging
+import os, re, random, argparse, subprocess, logging, json
 from datetime import datetime
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', filename='write.log')
@@ -8,64 +8,75 @@ parser.add_argument('-i', '--input-dir', type=str, help='Directory to read from'
 parser.add_argument('-o', '--output-dir', type=str, help='Directory to write to', required=True)
 args = parser.parse_args()
 
-def get_ext(path):
-    return os.path.splitext(path)[1]
-
-home = os.path.expanduser("~")
 im_dir = args.input_dir
-im_s = set()
-json_s = set()
+edited_im_dir = args.output_dir
 im_json_match_d = {}
 multiple_pattern = '\(\d+?\)$'
-im_path_d = {}
-json_path_d = {}
+im_s = set()
+json_s = set()
 for root, dirs, files in os.walk(im_dir):
     im_l = [f for f in files if not f.endswith('.json') and f != '.DS_Store']
-    json_l = [f for f in files if os.path.splitext(f)[1] == '.json' and f != 'metadata.json']
     for im in im_l:
-        if im in im_s:
-            print('Duplicate: {}'.format(os.path.join(root, im)))
-        im_s.add(os.path.join(root, im[:46]))
-        im_path = os.path.join(root, im)
-        im_path_d[os.path.join(root, im[:46])] = im_path
-    for json in json_l:
-        json_base = os.path.splitext(json)[0]
+        im_s.add(os.path.join(root, im))
+    json_l = [f for f in files if os.path.splitext(f)[1] == '.json' and f != 'metadata.json']
+    for json_t in json_l:
+        json_s.add(os.path.join(root, json_t))
+        with open(os.path.join(root, json_t), 'r', encoding='utf-8') as f:
+            json_data = json.load(f)
+        title = json_data['title'].replace("'", '_').replace(';', '_')
+        title_base, title_ext = os.path.splitext(title)
+        image_in_title = title_base[:51-len(title_ext)] + title_ext
+        json_base, json_ext = os.path.splitext(json_t)
         multiple_search = re.search(multiple_pattern, json_base)
         if multiple_search:
             multiple_text = multiple_search.group()
-            im_json_wo_multiple = re.sub(multiple_pattern, '', json_base)
-            im_json_split = os.path.splitext(im_json_wo_multiple)
-            json_base = im_json_split[0] + multiple_text + im_json_split[1]
-        if json_base in json_s:
-            print('Duplicate: {}'.format(os.path.join(root, json)))
-        json_s.add(os.path.join(root, json_base[:46]))
-        json_path = os.path.join(root, json)
-        json_path_d[os.path.join(root, json_base[:46])] = json_path
+            image_in_title_base, image_in_title_ext = os.path.splitext(image_in_title)
+            new_image_in_title = image_in_title_base + multiple_text + image_in_title_ext
+            if os.path.exists(os.path.join(root, new_image_in_title)):
+                im_json_match_d[os.path.join(root, new_image_in_title)] = os.path.join(root, json_t)
+            elif os.path.exists(os.path.join(root, image_in_title)):
+                im_json_match_d[os.path.join(root, image_in_title)] = os.path.join(root, json_t)
+            else:
+                print('No image for json: {}'.format(os.path.join(root, json_t)))
+        elif os.path.exists(os.path.join(root, image_in_title)):
+            im_json_match_d[os.path.join(root, image_in_title)] = os.path.join(root, json_t)
+        else:
+            print('No image for json: {}'.format(os.path.join(root, json_t)))
+            print('Image in title: {}'.format(image_in_title))
+            print('-' * 50)
+im_match_l, json_match_l = im_json_match_d.keys(), im_json_match_d.values()
 for im in im_s:
-    if im not in json_s:
-        print('Image without json: {}'.format(os.path.join(root, im)))
-for k, v in im_path_d.items():
-    if k not in json_path_d:
-        print('Image without json: {}'.format(v))
-    else:
-        im_json_match_d[v] = json_path_d[k]
-for json in json_s:
-    if json not in im_s:
-        print('JSON without image: {}'.format(os.path.join(root, json)))
+    if im not in im_match_l:
+        print('No json for image: {}'.format(im))
+        im_title = os.path.basename(im)
+        im_title_base, im_title_ext = os.path.splitext(im_title)
+        new_im_title = im_title
+        while os.path.exists(os.path.join(edited_im_dir, new_im_title)):
+            new_im_title = im_title_base + '-' + str(random.randint(1000, 9999)) + im_title_ext
+        new_im = os.path.join(edited_im_dir, new_im_title)
+        call = 'cp -v "{}" "{}"'.format(im, new_im)
+        logging.info('Running `{}`'.format(call))
+        process = subprocess.run(call, shell=True, capture_output=True)
+        stdout, stderr = process.stdout.decode('utf-8').strip(), process.stderr.decode('utf-8').strip()
+        if stdout:
+            logging.info(stdout)
+        if stderr:
+            logging.error(stderr)
+for json_t in json_s:
+    if json_t not in json_match_l:
+        print('No image for json: {}'.format(json_t))
 
-edited_im_dir = args.output_dir
-import json
 if not os.path.exists(edited_im_dir):
     os.mkdir(edited_im_dir)
 for k, v in im_json_match_d.items():
     if not os.path.exists(k):
-        print('JSON does not exist: {}'.format(k))
+        print('Image does not exist: {}'.format(k))
     # else:
-    #     print('JSON exists: {}'.format(k))
+    #     print('Image exists: {}'.format(k))
     if not os.path.exists(v):
-        print('Image does not exist: {}'.format(v))
+        print('JSON does not exist: {}'.format(v))
     # else:
-    #     print('Image exists: {}'.format(v))
+    #     print('JSON exists: {}'.format(v))
     md_l = []
     with open(v, 'r', encoding='utf-8') as f:
         json_data = json.load(f)
@@ -114,9 +125,9 @@ for k, v in im_json_match_d.items():
         if 'looks more like a JPEG' in stderr:
             k_jpeg = os.path.splitext(k)[0] + '.jpg'
             new_im_path_jpeg = os.path.splitext(new_im_path)[0] + '.jpg'
-            mv_call = 'cp -v "{}" "{}"'.format(k, k_jpeg)
-            logging.info('Running `{}`'.format(mv_call))
-            process = subprocess.run(mv_call, shell=True, capture_output=True)
+            call = 'cp -v "{}" "{}"'.format(k, k_jpeg)
+            logging.info('Running `{}`'.format(call))
+            process = subprocess.run(call, shell=True, capture_output=True)
             stdout, stderr = process.stdout.decode('utf-8').strip(), process.stderr.decode('utf-8').strip()
             if stdout:
                 logging.info(stdout)
